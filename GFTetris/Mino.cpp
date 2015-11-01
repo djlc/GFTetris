@@ -16,6 +16,8 @@ Mino::Mino(Array<char> data, Block::Color color)
 	sx = x; sy = y;
 
 	// —P—\ƒJƒEƒ“ƒ^
+	lastCnt = 30;
+
 	isFixed = false;
 
 	visible = true;
@@ -78,6 +80,10 @@ void Mino::drawShadow(int x, int y) {
 			}
 		}
 	}
+}
+
+void Mino::down(double v) {
+	y += v;
 }
 
 void Mino::update(int level) {

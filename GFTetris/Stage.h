@@ -1,6 +1,10 @@
 #pragma once
 #include "Array.h"
 #include "GameChild.h"
+#include "GameString.h"
+#include <list>
+
+using namespace std;
 
 class Block;
 class Mino;
@@ -34,6 +38,7 @@ class Stage : public GameChild {
 	Mino* nextMino;
 
 	// Level
+	int startLevel;
 	int level;
 
 	// Score
@@ -47,6 +52,9 @@ class Stage : public GameChild {
 
 	// 原点
 	const int x, y;
+
+	// 文字表示系
+	list<GameString*> string;
 
 	// ステージ初期化
 	void initStage();
@@ -63,16 +71,25 @@ class Stage : public GameChild {
 	// 1からrow行目を1段下にシフトする
 	void shiftField(int row);
 
-	void down(); // 自動落下
+	// ミノの移動
+	void down();
+	void drop();
 	void rotate(int direction);
 	void move(int direction);
+
+	// キー入力判定
 	void checkRotateKey();
 	bool checkDownKey();
+	bool checkDropKey();
 	void checkMoveKey();
+
+	// ミノの移動に関する判定
 	bool Judge();
 	bool downJudge();
 	bool moveJudge(int direction);
 	bool rotateJudge(int direction);
+
+	// ミノの固定
 	void fix();
 
 	// 影を作る
@@ -86,7 +103,7 @@ class Stage : public GameChild {
 
 public:
 
-	Stage(const int x, const int y);
+	Stage(const int x, const int y, const int startLevel);
 	~Stage();
 
 	// 実行メソッド

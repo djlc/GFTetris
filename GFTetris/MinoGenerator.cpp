@@ -28,6 +28,39 @@ Array<char> MinoGenerator::PENT_MINO[12] = {
 	Array<char>(5,5),
 };
 
+Block::Color MinoGenerator::setColor(int num) {
+
+	Block::Color color;
+
+	switch (num % 7) {
+	case 0:
+		color = Block::COLOR_YELLOW;
+		break;
+	case 1:
+		color = Block::COLOR_BLUE;
+		break;
+	case 2:
+		color = Block::COLOR_PURPLE;
+		break;
+	case 3:
+		color = Block::COLOR_ORANGE;
+		break;
+	case 4:
+		color = Block::COLOR_RED;
+		break;
+	case 5:
+		color = Block::COLOR_GREEN;
+		break;
+	case 6:
+		color = Block::COLOR_LIGHTBLUE;
+		break;
+	default:
+		color = Block::COLOR_NONE;
+		break;
+	}
+	return color;
+}
+
 MinoGenerator::MinoGenerator() {
 	// テトラミノ(ブロックを表す記号として0x01でなく0x31を使っていることに注意)
 	TETRA_MINO[0].load("1111");
@@ -60,35 +93,15 @@ Mino* MinoGenerator::getRandomMino() {
 	MinoGenerator();
 
 	// 色判定
-	Block::Color color;
+	Mino* mino;
 	int num = rand() % 7;
 	int pent = rand() % 12;
 
-	switch (num) {
-	case 0:
-		color = Block::COLOR_YELLOW;
-		break;
-	case 1:
-		color = Block::COLOR_BLUE;
-		break;
-	case 2:
-		color = Block::COLOR_PURPLE;
-		break;
-	case 3:
-		color = Block::COLOR_ORANGE;
-		break;
-	case 4:
-		color = Block::COLOR_RED;
-		break;
-	case 5:
-		color = Block::COLOR_GREEN;
-		break;
-	case 6:
-		color = Block::COLOR_LIGHTBLUE;
-		break;
-	default:
-		color = Block::COLOR_NONE;
-		break;
+	if (rand() % 6 != 0) {
+		mino = new Mino(TETRA_MINO[num], setColor(num));
+	} else {
+		mino = new Mino(PENT_MINO[pent], setColor(pent));
 	}
-	return new Mino((rand() % 5 == 0) ? PENT_MINO[pent] : TETRA_MINO[num], color);
+
+	return mino;
 }

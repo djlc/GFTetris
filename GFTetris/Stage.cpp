@@ -2,16 +2,29 @@
 #include "Block.h"
 #include "Mino.h"
 #include "MinoGenerator.h"
+#include "GameResource.h"
 #include "DxLib.h"
 
-Stage::Stage(const int _x, const int _y) : x(_x), y(_y), field(STAGE_WIDTH, STAGE_HEIGHT) {
+Stage::Stage(const int _x, const int _y, const int _startLevel)
+	: x(_x), y(_y), startLevel(_startLevel), field(STAGE_WIDTH, STAGE_HEIGHT) {
 	
 	initStage();
-	
+}
+
+Stage::~Stage() {
+}
+
+void Stage::initStage() {
+	for (int i = 0; i < STAGE_WIDTH; i++) {
+		for (int j = 0; j < STAGE_HEIGHT; j++) {
+			field(i, j) = (1 <= i && i <= STAGE_WIDTH - 2 && j != STAGE_HEIGHT - 1) ? Block() : Block(Block::BLOCK_WALL, Block::COLOR_WALL);
+		}
+	}
 	score = 0;
 	line = 0;
+	this->startLevel = startLevel;
 	level = 1;
-	
+
 	mino = MinoGenerator::getRandomMino();
 	nextMino = MinoGenerator::getRandomMino();
 
@@ -24,17 +37,6 @@ Stage::Stage(const int _x, const int _y) : x(_x), y(_y), field(STAGE_WIDTH, STAG
 	elist[2] = 0;	// TRIPLE
 	elist[3] = 0;	// TETRIS
 	elist[4] = 0;	// PENTRIS
-}
-
-Stage::~Stage() {
-}
-
-void Stage::initStage() {
-	for (int i = 0; i < STAGE_WIDTH; i++) {
-		for (int j = 0; j < STAGE_HEIGHT; j++) {
-			field(i, j) = (1 <= i && i <= STAGE_WIDTH - 2 && j != STAGE_HEIGHT - 1) ? Block() : Block(Block::BLOCK_WALL, Block::COLOR_WALL);
-		}
-	}
 }
 
 void Stage::draw() {
@@ -50,11 +52,9 @@ void Stage::draw() {
 	// ミノ
 	mino->draw(x + mino->getPosX(), y + mino->getPosY() );
 
-	DrawFormatString(0, 20, 0x00ffffff, "%d", mino->lastCnt);
-
 	// NEXT
 	DrawString(x + Block::BLOCK_SIZE * 14, y + Block::BLOCK_SIZE * 2, "NEXT", 0x00ffffff);
-	DrawBox(x + Block::BLOCK_SIZE * 14, y + Block::BLOCK_SIZE * 3, x + Block::BLOCK_SIZE * 20, y + Block::BLOCK_SIZE * 9, 0x00ffffff, false);
+	DrawBox(x + Block::BLOCK_SIZE * 14, y + Block::BLOCK_SIZE * 3, x + Block::BLOCK_SIZE * 21, y + Block::BLOCK_SIZE * 10, 0x00ffffff, false);
 	nextMino->draw(x + Block::BLOCK_SIZE * 15, y + Block::BLOCK_SIZE * 4);
 
 	// SCORE
@@ -68,6 +68,19 @@ void Stage::draw() {
 	DrawFormatString(x + Block::BLOCK_SIZE * 24, y + Block::BLOCK_SIZE * 19, 0x00ffffff, "TRIPLE  : %d", elist[2]);
 	DrawFormatString(x + Block::BLOCK_SIZE * 24, y + Block::BLOCK_SIZE * 21, 0x00ffffff, "TETRIS  : %d", elist[3]);
 	DrawFormatString(x + Block::BLOCK_SIZE * 24, y + Block::BLOCK_SIZE * 23, 0x00ffffff, "PENTRIS : %d", elist[4]);
+
+	// 文字列
+	for (list<GameString*>::iterator it = string.begin(); it != string.end();) {
+		(*it)->update();
+		if ((*it)->isTimeElapsed()) {
+			it = string.erase(it);
+			continue;
+		}
+		it++;
+	}
+
+	// Debug
+	//DrawFormatString(200, 0, 0x00ffffff, "Mino : (%.1f, %.1f), V : %.2f", mino->x, mino->y, (1.0 + (double)level) * 0.02);
 
 	// GameOver
 	if (isGameOver()) {
@@ -142,11 +155,20 @@ void Stage::checkRotateKey() {
 
 bool Stage::checkDownKey() {
 	if (CheckHitKey(KEY_INPUT_DOWN)) {
-		if (downJudge() && mino->cnt % 2) down();
+		if (downJudge()) {
+			mino->down(0.3);
+		}
 		if (!downJudge()) mino->lastCnt -= 5;
 		return true;
+	} else {
+		return false;
 	}
-	else {
+}
+
+bool Stage::checkDropKey() {
+	if (CheckHitKey(KEY_INPUT_UP)) {
+		return true;
+	} else {
 		return false;
 	}
 }
@@ -163,11 +185,14 @@ void Stage::checkMoveKey() {
 
 // 現在位置に重なったミノが1つでもあればfalseを返す
 bool Stage::Judge() {
+
+	int intMinoY = floor(mino->y);
+
 	for (int i = 0; i < mino->field.getHeight(); i++) {
 		for (int j = 0; j < mino->field.getHeight(); j++) {
 			if (mino->field(i, j).block == Block::BLOCK_MINO &&
-				(field(mino->x + i, mino->y + j).block == Block::BLOCK_WALL ||
-					field(mino->x + i, mino->y + j).block == Block::BLOCK_MINO)) return false;
+				(field(mino->x + i, intMinoY + j).block == Block::BLOCK_WALL ||
+					field(mino->x + i, intMinoY + j).block == Block::BLOCK_MINO)) return false;
 		}
 	}
 	return true;
@@ -175,11 +200,17 @@ bool Stage::Judge() {
 
 // 1ブロック下の部分に重なるミノが1つでもあればfalseを返す
 bool Stage::downJudge() {
+
+	int intMinoY = floor(mino->y);
+
 	for (int i = 0; i < mino->field.getHeight(); i++) {
 		for (int j = 0; j < mino->field.getHeight(); j++) {
 			if (mino->field(i, j).block == Block::BLOCK_MINO &&
-				(field(mino->x + i, mino->y + j + 1).block == Block::BLOCK_WALL ||
-					field(mino->x + i, mino->y + j + 1).block == Block::BLOCK_MINO)) return false;
+				(field(mino->x + i, intMinoY + j + 1).block == Block::BLOCK_WALL ||
+					field(mino->x + i, intMinoY + j + 1).block == Block::BLOCK_MINO)) {
+				mino->y = intMinoY;
+				return false;
+			}
 		}
 	}
 	return true;
@@ -187,11 +218,14 @@ bool Stage::downJudge() {
 
 // 移動する場所に重なるミノが1つでもあればfalseを返す
 bool Stage::moveJudge(int direction) {
+
+	int intMinoY = ceil(mino->y);
+
 	for (int i = 0; i < mino->field.getHeight(); i++) {
 		for (int j = 0; j < mino->field.getHeight(); j++) {
 			if (mino->field(i, j).block == Block::BLOCK_MINO &&
-				(field(mino->x + i + direction, mino->y + j).block == Block::BLOCK_WALL ||
-					field(mino->x + i + direction, mino->y + j).block == Block::BLOCK_MINO)) return false;
+				(field(mino->x + i + direction, intMinoY + j).block == Block::BLOCK_WALL ||
+					field(mino->x + i + direction, intMinoY + j).block == Block::BLOCK_MINO)) return false;
 		}
 	}
 	return true;
@@ -199,17 +233,20 @@ bool Stage::moveJudge(int direction) {
 
 // 回転移動する場所に重なるミノが1つでもあればfalseを返す
 bool Stage::rotateJudge(int direction) {
+
+	int intMinoY = ceil(mino->y);
+
 	for (int i = 0; i < mino->field.getHeight(); i++) {
 		for (int j = 0; j < mino->field.getHeight(); j++) {
 			if (mino->field(i, j).block == Block::BLOCK_MINO) {
 				if (direction == -1) {
-					if (field(mino->x + j, mino->y + mino->field.getHeight() - i - 1).block == Block::BLOCK_WALL ||
-						field(mino->x + j, mino->y + mino->field.getHeight() - i - 1).block == Block::BLOCK_MINO) {
+					if (field(mino->x + j, intMinoY + mino->field.getHeight() - i - 1).block == Block::BLOCK_WALL ||
+						field(mino->x + j, intMinoY + mino->field.getHeight() - i - 1).block == Block::BLOCK_MINO) {
 						return false;
 					}
 				} else {
-					if (field(mino->x + mino->field.getHeight() - j - 1, mino->y + i).block == Block::BLOCK_WALL ||
-						field(mino->x + mino->field.getHeight() - j - 1, mino->y + i).block == Block::BLOCK_MINO) {
+					if (field(mino->x + mino->field.getHeight() - j - 1, intMinoY + i).block == Block::BLOCK_WALL ||
+						field(mino->x + mino->field.getHeight() - j - 1, intMinoY + i).block == Block::BLOCK_MINO) {
 						return false;
 					}
 				}
@@ -234,7 +271,7 @@ void Stage::fix() {
 }
 
 void Stage::createShadow() {
-	mino->sy = 0;
+	mino->sy = mino->y;
 	while (true) {
 		for (int i = 0; i < mino->field.getHeight(); i++) {
 			for (int j = 0; j < mino->field.getHeight(); j++) {
@@ -257,7 +294,13 @@ bool Stage::isGameOver() {
 }
 
 void Stage::down() {
-	mino->y++;
+	// 落下速度計算式
+	double v = (1.0 + (double)level) * 0.01;
+	mino->down(v);
+}
+
+void Stage::drop() {
+	mino->y = mino->sy;
 }
 
 void Stage::eraseLine(int row) {
@@ -289,7 +332,7 @@ void Stage::shiftField(int row) {
 GameChild* Stage::update() {
 
 	// Level
-	level = line / 10 + 1;
+	level = startLevel + line / 10;
 	// スコア計算
 	score = elist[0] * 40 + elist[1] * 100 + elist[2] * 300 + elist[3] * 1200 + elist[4] * 6000;
 
@@ -309,9 +352,15 @@ GameChild* Stage::update() {
 		if (keyEnable) {
 			checkRotateKey();
 			checkMoveKey();
+			checkDownKey();
 			createShadow();
 			mino->cnt++;
-			if (checkDownKey() == false && downJudge() && (mino->cnt % (120 / level) == 0)) down();
+			if (downJudge()) down();
+			if (checkDropKey()) {
+				PlaySoundMem(GameResource::SHandle[0], DX_PLAYTYPE_BACK);
+				drop();
+				mino->lastCnt = 0;
+			}
 		}
 		
 		// ブロックと下で接しているならカウンタ開始
@@ -319,14 +368,17 @@ GameChild* Stage::update() {
 			mino->lastCnt--;
 		}
 		else {
-			mino->lastCnt = 50;
+			mino->lastCnt = 30;
 		}
 		// 猶予カウンタが0になったら固定
 		if (mino->lastCnt < 0) {
 			gameState = STATE_WAITING;	timer = 1;
 			next = STATE_MINO_FIX;
 		}
-		if (isGameOver()) gameState = STATE_GAMEOVER;
+		if (isGameOver()) {
+			gameState = STATE_WAITING;	timer = 30;
+			next = STATE_GAMEOVER;
+		}
 		break;
 
 	case STATE_MINO_FIX:
@@ -344,8 +396,7 @@ GameChild* Stage::update() {
 		if (timer == 0) {
 			// 時間になったら次へ進む
 			gameState = STATE_ERASE_LINE;
-		}
-		else {
+		} else {
 			for (int i = 0; i < localCnt; i++) {
 				DrawBox(x + Block::BLOCK_SIZE, y + Block::BLOCK_SIZE * list[i], x + Block::BLOCK_SIZE * 11, y + Block::BLOCK_SIZE * (list[i] + 1), 0x00ffffff, true);
 			}
@@ -358,12 +409,34 @@ GameChild* Stage::update() {
 		for (int i = 0; i < localCnt; i++) {
 			eraseLine(list[i]);
 			shiftField(list[i]);
+			PlaySoundMem(GameResource::SHandle[1], DX_PLAYTYPE_BACK);
 		}
 		if (localCnt >= 1) {
 			elist[localCnt - 1]++;	// スコア追加
 		}
 		
 		timer = 3;
+
+		switch (localCnt) {
+		case 0:
+
+			break;
+		case 1:
+			string.push_back(new GameString("SINGLE", 0, 450, 500, 0, 255, 255, 255, -254, -254, -254, 120, 120));
+			break;
+		case 2:
+			string.push_back(new GameString("DOUBLE", 0, 450, 500, 0, 255, 255, 255, -254, -254, -254, 120, 120));
+			break;
+		case 3:
+			string.push_back(new GameString("TRIPLE", 0, 450, 500, 0, 255, 255, 255, -254, -254, -254, 120, 120));
+			break;
+		case 4:
+			string.push_back(new GameString("TETRIS", 0, 450, 500, 0, 255, 255, 255, -254, -254, -254, 120, 120));
+			break;
+		case 5:
+			string.push_back(new GameString("PENTRIS", 0, 450, 500, 0, 255, 255, 255, -254, -254, -254, 120, 120));
+			break;
+		}
 
 		// 次のミノの準備
 		for (int i = 0; i < 5; i++) list[i] = 0;
@@ -375,10 +448,9 @@ GameChild* Stage::update() {
 		break;
 
 	case STATE_GAMEOVER:
-		mino->visible = false;
 		// ステージ
-		for (int i = 0; i < STAGE_WIDTH; i++) {
-			for (int j = 2; j < STAGE_HEIGHT; j++) {
+		for (int j = 2; j < STAGE_HEIGHT; j++) {
+			for (int i = 0; i < STAGE_WIDTH; i++) {
 				if (field(i, j).block == Block::BLOCK_MINO) {
 					field(i, j).block = Block::BLOCK_WALL;
 					field(i, j).color = Block::COLOR_WALL;
@@ -387,9 +459,7 @@ GameChild* Stage::update() {
 		}
 
 		if (CheckHitKey(KEY_INPUT_ESCAPE)) {
-			Stage(40, 40);
-			gameState = STATE_MINO_MOVING;
-			next = STATE_MINO_MOVING;
+			initStage();
 		}
 		break;
 	

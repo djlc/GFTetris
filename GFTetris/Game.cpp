@@ -2,11 +2,13 @@
 #include "Game.h"
 #include "Stage.h"
 #include "Fps.h"
+#include "GameResource.h"
 
 Game::Game() {
+	// 効果音
+	GameResource::init();
 	// ステージ
-	list.push_back(new Stage(40, 40));
-
+	list.push_back(new Stage(40, 40, 1));
 	// FPS制御
 	list.push_back(new Fps());
 }
